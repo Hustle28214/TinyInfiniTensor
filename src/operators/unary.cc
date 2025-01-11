@@ -35,11 +35,17 @@ namespace infini
 
     optional<vector<Shape>> ClipObj::inferShape(const TensorVec &inputs)
     {
+        
+        const auto A = inputs[0];
+        auto input_dim = A->getDims();
         // =================================== 作业 ===================================
         // TODO：返回经过 clip 操作后的 shape
         // REF: https://onnx.ai/onnx/operators/onnx__Clip.html#clip-13
         // =================================== 作业 ===================================
-        return std::nullopt;
+
+        // just limit its shape but not change it
+        
+        return {{input_dim}};
     }
 
     std::string ClipObj::toString() const
