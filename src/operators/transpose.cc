@@ -33,6 +33,7 @@ namespace infini
         // TODO：修改 output_dim，返回正确的 transpose 后的 shape
         // REF: https://onnx.ai/onnx/operators/onnx__Transpose.html#transpose-21
         // =================================== 作业 ===================================
+
         
         // 检查rank是否和permute的大小相同
         if (size_t(rank) < transposePermute.size())
