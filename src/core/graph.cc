@@ -156,7 +156,7 @@ namespace infini
         size_t sizeTensorPtr = this->tensors.size();
         std::vector<size_t> offset;
         // getBytes()
-        for(auto tensor:tensors){
+        for(const auto tensor:tensors){
             offset.push_back(allocator.alloc(tensor->getBytes()));
         }
         auto dptr = this->allocator.getPtr();
