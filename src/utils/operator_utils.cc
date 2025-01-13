@@ -97,6 +97,3 @@ std::string get_kernel_attrs_str(const KernelAttrs &kernelAttrs) {
 }
 
 } // namespace infini
-
-
-} // namespace infini
