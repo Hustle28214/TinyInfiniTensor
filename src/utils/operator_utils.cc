@@ -9,8 +9,38 @@ Shape infer_broadcast(const Shape &A, const Shape &B) {
     // TODO：对 A 和 B 进行双向广播，返回广播后的形状。
     // REF: https://github.com/onnx/onnx/blob/main/docs/Broadcasting.md
     // =================================== 作业 ===================================
+    // Shape getDims() const { return shape; }
+    // auto res = infer_broadcast(A->getDims(), B->getDims());
     
-    return {};
+    size_t rankA = A.size();
+    size_t rankB = B.size();
+    size_t rankMax = std::max(rankA, rankB);
+
+    Shape extendedA(rankMax, 1);
+    Shape extendedB(rankMax, 1);
+    Shape broadcastShape(rankMax);
+
+    
+    for (size_t i = 0; i < rankA; ++i) {
+        extendedA[rankMax - rankA + i] = A[i];
+    }
+    for (size_t i = 0; i < rankB; ++i) {
+        extendedB[rankMax - rankB + i] = B[i];
+    }
+
+    for (size_t i = 0; i < rankMax; ++i) {
+        if (extendedA[i] == extendedB[i]) {
+            broadcastShape[i] = extendedA[i];
+        } else if (extendedA[i] == 1) {
+            broadcastShape[i] = extendedB[i];
+        } else if (extendedB[i] == 1) {
+            broadcastShape[i] = extendedA[i];
+        } else {
+            IT_ASSERT(false && "Incompatible shapes for broadcasting");
+        }
+    }
+
+    return broadcastShape;
 }
 
 int get_real_axis(const int &axis, const int &rank) {
@@ -65,5 +95,8 @@ std::string get_kernel_attrs_str(const KernelAttrs &kernelAttrs) {
     std::string opStr = OpType(std::get<1>(kernelAttrs)).toString();
     return deviceStr + ", " + opStr;
 }
+
+} // namespace infini
+
 
 } // namespace infini
