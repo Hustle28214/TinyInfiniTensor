@@ -98,15 +98,117 @@ namespace infini
         return this->sorted = true;
     }
 
-    void GraphObj::optimize()
-    {
-        // =================================== 作业 ===================================
-        // TODO: 设计一个算法来实现指定的图优化规则
-        // 图优化规则如下：
-        // 1. 去除冗余的算子（例如，两个相邻的算子都是 transpose 算子，且做的是相反的操作，可以将其全部删除）
-        // 2. 合并算子（例如，矩阵乘算子中含有属性transA、transB，如果其输入存在transpose，且对最后两个维度做交换，就可以将transpose融入到矩阵乘算子的属性中去）
-        // =================================== 作业 ===================================
+    void GraphObj::optimize() {
+    if (!this->topo_sort()) {
+        return;
     }
+
+    bool optimized;
+    do {
+        optimized = false;
+
+        for (size_t i = 0; i < ops.size(); ++i) {
+            auto op = ops[i];
+            if (op->getOpType() == OpType::Transpose) {
+                auto opd = std::dynamic_pointer_cast<TransposeObj>(op);
+                auto input = op->getInputs(0);
+                auto prevOp = input->getSource();
+
+                if (prevOp && prevOp->getOpType() == OpType::Transpose && input->getTargets().size() == 1) {
+                    auto prevOpd = std::dynamic_pointer_cast<TransposeObj>(prevOp);
+                    auto prevInput = prevOp->getInputs(0);
+
+                    // Combine permutations
+                    auto perm = opd->getPermute();
+                    bool isIdentity = true;
+                    for (size_t j = 0; j < perm.size(); ++j) {
+                        perm[j] = prevOpd->getPermute()[perm[j]];
+                        if (perm[j] != int(j)) {
+                            isIdentity = false;
+                        }
+                    }
+
+                    prevInput->removeTarget(prevOp);
+                    if (isIdentity) {
+                        for (auto succ : op->getSuccessors()) {
+                            succ->replaceInput(op->getOutput(), prevInput);
+                            prevInput->addTarget(succ);
+                        }
+                        this->removeTensor(op->getOutput());
+                    } else {
+                        auto newOp = make_ref<TransposeObj>(this, prevInput, op->getOutput(), perm);
+                        this->addOperatorAndConnect(newOp);
+                    }
+
+                    for (auto pred : prevOp->getPredecessors()) {
+                        pred->removeSuccessors(prevOp);
+                    }
+                    for (auto succ : op->getSuccessors()) {
+                        succ->removePredecessors(op);
+                    }
+
+                    
+                    this->removeTensor(input);
+                    this->removeOperator(op);
+                    this->removeOperator(prevOp);
+                    optimized = true;
+                    i -= 2;  
+                    break;
+                }
+            }
+
+            if (op->getOpType() == OpType::MatMul) {
+                auto matmulOp = std::dynamic_pointer_cast<MatmulObj>(op);
+
+                // Check inputs for transpose
+                for (int inputIdx = 0; inputIdx < 2; ++inputIdx) {
+                    auto input = op->getInputs(inputIdx);
+                    auto transposeOp = input->getSource();
+
+                    if (transposeOp && transposeOp->getOpType() == OpType::Transpose && input->getTargets().size() == 1) {
+                        auto transposeObj = std::dynamic_pointer_cast<TransposeObj>(transposeOp);
+                        auto perm = transposeObj->getPermute();
+
+                        bool isLastTwoSwapped = (perm.size() > 1 && perm[perm.size() - 2] == int(perm.size() - 1) &&
+                                                 perm[perm.size() - 1] == int(perm.size() - 2));
+                        bool isIdentityElsewhere = true;
+                        for (size_t j = 0; j < perm.size() - 2; ++j) {
+                            if (perm[j] != int(j)) {
+                                isIdentityElsewhere = false;
+                                break;
+                            }
+                        }
+                        if (!isLastTwoSwapped || !isIdentityElsewhere) {
+                            continue;
+                        }
+
+                        // Merge transpose into MatMul
+                        if (inputIdx == 0) {
+                            matmulOp->setTransA(!matmulOp->getTransA());
+                        } else {
+                            matmulOp->setTransB(!matmulOp->getTransB());
+                        }
+
+                        // Update connections
+                        auto prevInput = transposeOp->getInputs(0);
+                        prevInput->removeTarget(transposeOp);
+                        prevInput->addTarget(matmulOp);
+                        matmulOp->replaceInput(input, prevInput);
+                        matmulOp->removePredecessors(transposeOp);
+
+                        // Remove Transpose
+                        this->removeTensor(input);
+                        this->removeOperator(transposeOp);
+                        optimized = true;
+                        break;
+                    }
+                }
+            }
+        }
+    } while (optimized);
+}
+
+
 
     Tensor GraphObj::getTensor(int fuid) const
     {
@@ -161,7 +263,7 @@ namespace infini
         }
         auto dptr = this->allocator.getPtr();
         for(size_t i = 0 ;i<sizeTensorPtr;++i){
-            auto rptr = dptr + offset[i];
+            auto rptr = reinterpret_cast<char*>(dptr) + offset[i];
             this->tensors[i] -> setDataBlob(make_ref<BlobObj>(this->runtime, (void*)rptr));
         }
         
