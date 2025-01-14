@@ -1,8 +1,11 @@
 #include "core/graph.h"
+#include "core/op_type.h"
+#include "operators/matmul.h"
+#include "operators/transpose.h"
 #include <algorithm>
 #include <numeric>
 #include <queue>
-
+#include <vector>
 namespace infini
 {
 
@@ -98,7 +101,9 @@ namespace infini
         return this->sorted = true;
     }
 
-    void GraphObj::optimize() {
+    
+
+void GraphObj::optimize() {
     if (!this->topo_sort()) {
         return;
     }
@@ -210,6 +215,10 @@ namespace infini
 
 
 
+
+
+
+
     Tensor GraphObj::getTensor(int fuid) const
     {
         for (auto tensor : tensors)
@@ -254,11 +263,10 @@ namespace infini
         // TODO：利用 allocator 给计算图分配内存
         // HINT: 获取分配好的内存指针后，可以调用 tensor 的 setDataBlob 函数给 tensor 绑定内存
         // =================================== 作业 ===================================
-
         size_t sizeTensorPtr = this->tensors.size();
         std::vector<size_t> offset;
         // getBytes()
-        for(auto tensor:tensors){
+        for(const auto tensor:tensors){
             offset.push_back(allocator.alloc(tensor->getBytes()));
         }
         auto dptr = this->allocator.getPtr();
@@ -268,6 +276,8 @@ namespace infini
         }
         
         allocator.info();
+
+
     }
 
     Tensor GraphObj::addTensor(Shape dim, DataType dtype)
